@@ -1,15 +1,30 @@
 HTML
-<div class="textContainer">
-  This is the HTML control content
+<div class="main-wrapper">
+  <div class="textContainer">
+    <div class="empty-msg">Loading extraction data...</div>
+  </div>
+  <div class="footer-actions">
+    <button id="confirmChangesBtn" class="confirm-btn">Confirm All Changes</button>
+  </div>
 </div>
 
 CSS
+@import url("https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap");
+
+.main-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f5f7f9;
+}
+
 .textContainer {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
   gap: 15px;
   padding: 20px;
-  background-color: #f5f7f9;
+  overflow-y: auto;
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -26,7 +41,6 @@ CSS
   font-size: 24px;
   color: #4a5568;
   font-weight: 600;
-  margin-bottom: 5px;
 }
 
 .card-row {
@@ -53,18 +67,7 @@ CSS
   padding: 8px 12px;
   font-size: 14px;
   color: #2d3748;
-  background-color: #fff;
   box-sizing: border-box;
-}
-
-.edit-input:focus {
-  outline: none;
-  border-color: #0078d4;
-}
-
-.card-value {
-  font-size: 14px;
-  color: #2d3748;
 }
 
 .card-justification {
@@ -73,57 +76,85 @@ CSS
   background: #f8fafc;
   padding: 10px;
   border-radius: 4px;
-  margin: 0;
-  line-height: 1.4;
   border: 1px solid #edf2f7;
 }
 
-.empty-msg {
-  text-align: center;
-  color: #a0aec0;
-  padding: 50px;
-  font-style: italic;
+.footer-actions {
+  padding: 15px 20px;
+  background: #fff;
+  border-top: 1px solid #d1d9e0;
+  display: flex;
+  justify-content: flex-end;
 }
+
+.confirm-btn {
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 JS
 (async function () {
   const container = document.querySelector(".textContainer");
-  let isUpdatingInternally = false;
+  const confirmBtn = document.querySelector("#confirmChangesBtn");
+  
+  let currentRootObject = {};
+  let currentItems = [];
 
-  async function updateUI() {
-    // Prevent re-rendering loops when the script updates the variable
-    if (isUpdatingInternally) return;
-
+  async function loadData() {
     const rawDataString = await App.getVariable("str_JsonData") || "";
-    let rootObject = {};
-    let itemList = [];
-
     try {
       if (rawDataString && rawDataString.trim() !== "") {
-        rootObject = JSON.parse(rawDataString);
-        itemList = rootObject.extracted_services || (Array.isArray(rootObject) ? rootObject : []);
+        currentRootObject = JSON.parse(rawDataString);
+        currentItems = currentRootObject.extracted_services || (Array.isArray(currentRootObject) ? currentRootObject : []);
       }
     } catch (e) {
       container.innerHTML = "<div class='empty-msg'>Error parsing JSON. Check str_JsonData format.</div>";
       return;
     }
-
-    if (itemList.length === 0) {
+    if (currentItems.length === 0) {
       container.innerHTML = "<div class='empty-msg'>No services found.</div>";
       return;
     }
+    renderCards();
+  }
 
+  // Helper to format currency with thousands separator
+  function formatCurrency(input) {
+    // Remove everything except numbers and one decimal point
+    let value = input.replace(/[^\d.]/g, "");
+    let parts = value.split(".");
+    
+    // Handle the integer part with thousands separator
+    if (parts[0]) {
+      parts[0] = parseInt(parts[0]).toLocaleString('en-US');
+    }
+    
+    // Limit decimal part to 2 digits
+    if (parts.length > 1) {
+      parts[1] = parts[1].slice(0, 2);
+      return "$" + parts[0] + "." + parts[1];
+    }
+    
+    return value ? "$" + parts[0] : "$";
+  }
+
+  function renderCards() {
     container.innerHTML = ""; 
-
-    itemList.forEach((item, index) => {
-      const name = item.nameOfService || item.NameOfService || "Service Name";
-      const date = item.dateOfService || item.DateOfService || "";
-      const conf = item.confidence || item.Confidence || "";
-      const just = item.justification || item.Justification || "";
-      let amount = item.amount || item.Amount || "$0.00";
+    currentItems.forEach((item, index) => {
+      const name = item.nameOfService || "Service Name";
+      const date = item.dateOfService || "";
+      const conf = item.confidence || "";
+      const just = item.justification || "";
+      const amount = item.amount || "$0.00";
 
       const card = document.createElement("div");
       card.className = "service-card";
-
       card.innerHTML = `
         <div class="card-title">${name}</div>
         <div class="card-row">
@@ -135,7 +166,7 @@ JS
         <div class="card-row">
           <span class="card-label">Service Amount</span>
           <div class="card-input-wrapper">
-            <input type="text" class="edit-input amount-field" value="${amount.startsWith('$') ? amount : '$' + amount}">
+            <input type="text" class="edit-input amount-field" value="${amount}">
           </div>
         </div>
         <div class="card-row">
@@ -151,41 +182,32 @@ JS
       const dateInput = card.querySelector(".date-field");
       const amountInput = card.querySelector(".amount-field");
 
-      // Amount Masking: Forces $ and max 2 decimals
-      amountInput.addEventListener("input", (e) => {
-        let value = e.target.value.replace(/[^\d.]/g, ""); 
-        let parts = value.split(".");
-        if (parts.length > 1) {
-          parts[1] = parts[1].slice(0, 2); 
-          value = parts[0] + "." + parts[1];
-        }
-        e.target.value = "$" + value;
-        syncToVariable();
+      dateInput.addEventListener("change", () => {
+        currentItems[index].dateOfService = dateInput.value;
       });
 
-      const syncToVariable = () => {
-        item.dateOfService = dateInput.value;
-        item.amount = amountInput.value;
-        
-        isUpdatingInternally = true;
-        const updatedJson = JSON.stringify({
-          ...rootObject,
-          extracted_services: itemList
-        });
-        App.setVariable("str_JsonData", updatedJson);
-        
-        // Timeout prevents UI flickering during variable update
-        setTimeout(() => { isUpdatingInternally = false; }, 100);
-      };
-
-      dateInput.addEventListener("change", syncToVariable);
+      amountInput.addEventListener("input", (e) => {
+        // Apply the currency mask with separators
+        const formatted = formatCurrency(e.target.value);
+        e.target.value = formatted;
+        currentItems[index].amount = formatted;
+      });
 
       container.appendChild(card);
     });
   }
 
-  updateUI();
-  App.onVariableChange("str_JsonData", () => updateUI());
+  confirmBtn.onclick = async () => {
+    const updatedJson = JSON.stringify({
+      ...currentRootObject,
+      extracted_services: currentItems
+    });
+    await App.setVariable("str_JsonData", updatedJson);
+    alert("Changes saved successfully!");
+  };
+
+  loadData();
+  App.onVariableChange("str_JsonData", () => loadData());
 })();
 
 str_JsonData
