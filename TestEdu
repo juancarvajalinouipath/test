@@ -1,0 +1,80 @@
+HTML
+<div class="textContainer">
+  <!-- Checkbox list will be injected here -->
+</div>
+
+CSS
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans");
+
+.textContainer {
+  height: 100%;
+  background-color: #ffffff;
+  font-family: 'Noto Sans';
+  font-size: 14px;
+  color: #333333;  
+  display: flex;
+  flex-direction: row; /* <--- key change */
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px;
+  gap: 20px; /* space between checkbox+label groups */
+  flex-wrap: wrap; /* allows wrapping on small screens */
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+JS
+(async function () {
+  // 1. Get item list and selected values from App
+  let itemList = await App.getVariable("var_AllCheckboxNames") || [];
+  let selectedItems = await App.getVariable("var_SelectedQueueCheckboxNames") || [];
+
+  const container = document.querySelector(".textContainer");
+
+  function renderCheckboxes() {
+    container.innerHTML = ""; // Clear container
+
+    itemList.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "checkbox-row";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = item;
+      checkbox.checked = selectedItems.includes(item);
+
+      checkbox.addEventListener("change", function () {
+        const isChecked = this.checked;
+        const index = selectedItems.indexOf(item);
+        if (isChecked && index === -1) {
+          selectedItems.push(item);
+        } else if (!isChecked && index !== -1) {
+          selectedItems.splice(index, 1);
+        }
+
+        App.setVariable("var_SelectedQueueCheckboxNames", selectedItems);
+      });
+
+      const label = document.createElement("label");
+      label.setAttribute("for", item);
+      label.textContent = item;
+
+      row.appendChild(checkbox);
+      row.appendChild(label);
+      container.appendChild(row);
+    });
+  }
+
+  // Initial render
+  renderCheckboxes();
+
+  // Listen to changes in var_SelectedQueueCheckboxNames
+  App.onVariableChange("var_SelectedQueueCheckboxNames", (newValue) => {
+    selectedItems = newValue || [];
+    renderCheckboxes();
+  });
+})();
