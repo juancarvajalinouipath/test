@@ -1,80 +1,192 @@
 HTML
 <div class="textContainer">
-  <!-- Checkbox list will be injected here -->
+  This is the HTML control content
 </div>
 
 CSS
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans");
-
 .textContainer {
-  height: 100%;
-  background-color: #ffffff;
-  font-family: 'Noto Sans';
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 20px;
+  background-color: #f5f7f9;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.service-card {
+  background: #ffffff;
+  border: 2px solid #aeb8c2;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 24px;
+  color: #4a5568;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  min-height: 45px;
+}
+
+.card-label {
+  width: 180px;
   font-size: 14px;
-  color: #333333;  
-  display: flex;
-  flex-direction: row; /* <--- key change */
-  align-items: center;
-  justify-content: flex-start;
-  padding: 16px;
-  gap: 20px; /* space between checkbox+label groups */
-  flex-wrap: wrap; /* allows wrapping on small screens */
+  color: #4a5568;
 }
 
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.card-input-wrapper {
+  width: 350px; 
 }
 
+.edit-input {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #718096;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #2d3748;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+
+.edit-input:focus {
+  outline: none;
+  border-color: #0078d4;
+}
+
+.card-value {
+  font-size: 14px;
+  color: #2d3748;
+}
+
+.card-justification {
+  font-size: 13px;
+  color: #718096;
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 0;
+  line-height: 1.4;
+  border: 1px solid #edf2f7;
+}
+
+.empty-msg {
+  text-align: center;
+  color: #a0aec0;
+  padding: 50px;
+  font-style: italic;
+}
 JS
 (async function () {
-  // 1. Get item list and selected values from App
-  let itemList = await App.getVariable("var_AllCheckboxNames") || [];
-  let selectedItems = await App.getVariable("var_SelectedQueueCheckboxNames") || [];
-
   const container = document.querySelector(".textContainer");
+  let isUpdatingInternally = false;
 
-  function renderCheckboxes() {
-    container.innerHTML = ""; // Clear container
+  async function updateUI() {
+    // Prevent re-rendering loops when the script updates the variable
+    if (isUpdatingInternally) return;
 
-    itemList.forEach(item => {
-      const row = document.createElement("div");
-      row.className = "checkbox-row";
+    const rawDataString = await App.getVariable("str_JsonData") || "";
+    let rootObject = {};
+    let itemList = [];
 
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.id = item;
-      checkbox.checked = selectedItems.includes(item);
+    try {
+      if (rawDataString && rawDataString.trim() !== "") {
+        rootObject = JSON.parse(rawDataString);
+        itemList = rootObject.extracted_services || (Array.isArray(rootObject) ? rootObject : []);
+      }
+    } catch (e) {
+      container.innerHTML = "<div class='empty-msg'>Error parsing JSON. Check str_JsonData format.</div>";
+      return;
+    }
 
-      checkbox.addEventListener("change", function () {
-        const isChecked = this.checked;
-        const index = selectedItems.indexOf(item);
-        if (isChecked && index === -1) {
-          selectedItems.push(item);
-        } else if (!isChecked && index !== -1) {
-          selectedItems.splice(index, 1);
+    if (itemList.length === 0) {
+      container.innerHTML = "<div class='empty-msg'>No services found.</div>";
+      return;
+    }
+
+    container.innerHTML = ""; 
+
+    itemList.forEach((item, index) => {
+      const name = item.nameOfService || item.NameOfService || "Service Name";
+      const date = item.dateOfService || item.DateOfService || "";
+      const conf = item.confidence || item.Confidence || "";
+      const just = item.justification || item.Justification || "";
+      let amount = item.amount || item.Amount || "$0.00";
+
+      const card = document.createElement("div");
+      card.className = "service-card";
+
+      card.innerHTML = `
+        <div class="card-title">${name}</div>
+        <div class="card-row">
+          <span class="card-label">Service Date</span>
+          <div class="card-input-wrapper">
+            <input type="date" class="edit-input date-field" value="${date}">
+          </div>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Service Amount</span>
+          <div class="card-input-wrapper">
+            <input type="text" class="edit-input amount-field" value="${amount.startsWith('$') ? amount : '$' + amount}">
+          </div>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Confidence Score</span>
+          <span class="card-value">${conf}</span>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Justification</span>
+          <p class="card-justification">${just}</p>
+        </div>
+      `;
+
+      const dateInput = card.querySelector(".date-field");
+      const amountInput = card.querySelector(".amount-field");
+
+      // Amount Masking: Forces $ and max 2 decimals
+      amountInput.addEventListener("input", (e) => {
+        let value = e.target.value.replace(/[^\d.]/g, ""); 
+        let parts = value.split(".");
+        if (parts.length > 1) {
+          parts[1] = parts[1].slice(0, 2); 
+          value = parts[0] + "." + parts[1];
         }
-
-        App.setVariable("var_SelectedQueueCheckboxNames", selectedItems);
+        e.target.value = "$" + value;
+        syncToVariable();
       });
 
-      const label = document.createElement("label");
-      label.setAttribute("for", item);
-      label.textContent = item;
+      const syncToVariable = () => {
+        item.dateOfService = dateInput.value;
+        item.amount = amountInput.value;
+        
+        isUpdatingInternally = true;
+        const updatedJson = JSON.stringify({
+          ...rootObject,
+          extracted_services: itemList
+        });
+        App.setVariable("str_JsonData", updatedJson);
+        
+        // Timeout prevents UI flickering during variable update
+        setTimeout(() => { isUpdatingInternally = false; }, 100);
+      };
 
-      row.appendChild(checkbox);
-      row.appendChild(label);
-      container.appendChild(row);
+      dateInput.addEventListener("change", syncToVariable);
+
+      container.appendChild(card);
     });
   }
 
-  // Initial render
-  renderCheckboxes();
-
-  // Listen to changes in var_SelectedQueueCheckboxNames
-  App.onVariableChange("var_SelectedQueueCheckboxNames", (newValue) => {
-    selectedItems = newValue || [];
-    renderCheckboxes();
-  });
+  updateUI();
+  App.onVariableChange("str_JsonData", () => updateUI());
 })();
+
+str_JsonData
+"{ ""claimNumber"": ""CLM-RAND-7721"", ""extracted_services"": [ { ""dateOfService"": ""2024-05-12"", ""nameOfService"": ""Emergency Room Visit - Level 4"", ""confidence"": ""96%"", ""justification"": ""Patient presented with acute abdominal pain; service identified in the ER Triage notes on page 2."", ""amount"": ""$1,250.00"", ""justificationSource"": [ { ""pageNumber"": ""2"", ""fileName"": ""ER_Notes_May.pdf"" } ] }, { ""dateOfService"": ""2024-05-13"", ""nameOfService"": ""CT Scan Abdomen w/ Contrast"", ""confidence"": ""88%"", ""justification"": ""Imaging procedure confirmed via the Radiology department signature block on page 4. Contrast agent lot #445 used."", ""amount"": ""$850.00"", ""justificationSource"": [ { ""pageNumber"": ""4"", ""fileName"": ""Imaging_Results.pdf"" } ] }, { ""dateOfService"": ""2024-05-13"", ""nameOfService"": ""Complete Blood Count (CBC)"", ""confidence"": ""99%"", ""justification"": ""Lab results clearly listed in the 'Hematology' section of the discharge summary. Automated extraction high match."", ""amount"": ""$45.00"", ""justificationSource"": [ { ""pageNumber"": ""1"", ""fileName"": ""Lab_Report_Export.pdf"" } ] }, { ""dateOfService"": ""2024-05-14"", ""nameOfService"": ""Intravenous Hydration (1st Hour)"", ""confidence"": ""72%"", ""justification"": ""Inferred from nursing logs mentioning IV start time at 08:00 and termination at 09:15. Requires manual verification."", ""amount"": ""$120.00"", ""justificationSource"": [ { ""pageNumber"": ""7"", ""fileName"": ""Nursing_Flowsheet.pdf"" } ] }, { ""dateOfService"": ""2024-05-15"", ""nameOfService"": ""Consultation - Gastroenterology"", ""confidence"": ""91%"", ""justification"": ""Specialist referral found in the post-op plan. Focus on follow-up care for persistent gastric symptoms."", ""amount"": ""$315.00"", ""justificationSource"": [ { ""pageNumber"": ""9"", ""fileName"": ""Specialist_Referral.pdf"" } ] } ] }"
