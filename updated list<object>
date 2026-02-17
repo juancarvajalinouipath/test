@@ -1,0 +1,84 @@
+(async function () {
+  const container = document.querySelector(".textContainer");
+  const confirmBtn = document.querySelector("#confirmChangesBtn");
+  let currentItems = [];
+
+  async function loadData() {
+    // Retrieve the native List(Of Object)
+    const data = await App.getVariable("var_MatchedServices_Array");
+    console.log("Data loaded from App:", data);
+
+    if (!data || !Array.isArray(data)) {
+      container.innerHTML = "<div class='empty-msg'>Waiting for data initialization...</div>";
+      return;
+    }
+
+    // Clone to prevent unexpected mutation before confirmation
+    currentItems = JSON.parse(JSON.stringify(data));
+    renderCards();
+  }
+
+  function formatCurrency(input) {
+    let value = String(input).replace(/[^\d.]/g, "");
+    let parts = value.split(".");
+    if (parts[0]) parts[0] = parseInt(parts[0]).toLocaleString('en-US');
+    if (parts.length > 1) {
+      parts[1] = parts[1].slice(0, 2);
+      return "$" + parts[0] + "." + parts[1];
+    }
+    return value ? "$" + parts[0] : "$";
+  }
+
+  function renderCards() {
+    container.innerHTML = ""; 
+    currentItems.forEach((item, index) => {
+      const card = document.createElement("div");
+      card.className = "service-card";
+      card.innerHTML = `
+        <div class="card-title">${item.benefitName || "Service"}</div>
+        <div class="card-row">
+          <span class="card-label">Service Date</span>
+          <div class="card-input-wrapper">
+            <input type="date" class="edit-input date-field" value="${item.serviceDate || ''}">
+          </div>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Service Amount</span>
+          <div class="card-input-wrapper">
+            <input type="text" class="edit-input amount-field" value="${item.amount || '$0.00'}">
+          </div>
+        </div>
+        <div class="card-row">
+            <span class="card-label">Confidence Score</span>
+            <span class="card-value">${item.confidence || '0%'}</span>
+        </div>
+        <div class="card-row">
+            <span class="card-label">Justification</span>
+            <div class="card-justification">${item.justification || ''}</div>
+        </div>
+      `;
+
+      const dIn = card.querySelector(".date-field");
+      const aIn = card.querySelector(".amount-field");
+
+      // Update local copy
+      dIn.addEventListener("change", () => { currentItems[index].serviceDate = dIn.value; });
+      aIn.addEventListener("input", (e) => {
+        const formatted = formatCurrency(e.target.value);
+        e.target.value = formatted;
+        currentItems[index].amount = formatted;
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  confirmBtn.onclick = async () => {
+    console.log("Saving back to App:", currentItems);
+    await App.setVariable("var_MatchedServices_Array", currentItems);
+    alert("Changes successfully saved to the App variable!");
+  };
+
+  loadData();
+  App.onVariableChange("var_MatchedServices_Array", () => loadData());
+})();
