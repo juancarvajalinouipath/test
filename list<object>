@@ -1,0 +1,18 @@
+New List(Of Object) From {
+    New With {
+        .benefitName = "Annual Physical Examination",
+        .category = "Preventive Care",
+        .confidence = "98%",
+        .justification = "Service identified in the Routine Wellness section.",
+        .amount = "$1,250.00",
+        .serviceDate = "2024-06-10"
+    },
+    New With {
+        .benefitName = "Magnetic Resonance Imaging (MRI)",
+        .category = "Diagnostic Imaging",
+        .confidence = "85%",
+        .justification = "Confirmed via radiology request form on page 4.",
+        .amount = "$850.00",
+        .serviceDate = "2024-06-12"
+    }
+}
