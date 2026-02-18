@@ -16,3 +16,189 @@ New List(Of Object) From {
         .serviceDate = "2024-06-12"
     }
 }
+
+
+HTML
+<div class="main-wrapper">
+  <div class="textContainer">
+    <div class="empty-msg">Loading services...</div>
+  </div>
+  <div class="footer-actions">
+    <button id="confirmChangesBtn" class="confirm-btn">Confirm All Changes</button>
+  </div>
+</div>
+
+CSS
+@import url("https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap");
+
+.main-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f5f7f9;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+.textContainer {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.service-card {
+  background: #ffffff;
+  border: 2px solid #aeb8c2;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 24px;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  min-height: 45px;
+}
+
+.card-label {
+  width: 180px;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+/* Symmetrical input sizing */
+.card-input-wrapper {
+  width: 350px; 
+}
+
+.edit-input {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #718096;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.card-justification {
+  font-size: 13px;
+  color: #718096;
+  background: #f8fafc;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #edf2f7;
+}
+
+.footer-actions {
+  padding: 15px 20px;
+  background: #fff;
+  border-top: 1px solid #d1d9e0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.confirm-btn {
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+JS
+(async function () {
+  const container = document.querySelector(".textContainer");
+  const confirmBtn = document.querySelector("#confirmChangesBtn");
+  let currentItems = [];
+
+  async function loadData() {
+    // Retrieve the native List(Of Object)
+    const data = await App.getVariable("var_MatchedServices_Array");
+    console.log("Data loaded from App:", data);
+
+    if (!data || !Array.isArray(data)) {
+      container.innerHTML = "<div class='empty-msg'>Waiting for data initialization...</div>";
+      return;
+    }
+
+    // Clone to prevent unexpected mutation before confirmation
+    currentItems = JSON.parse(JSON.stringify(data));
+    renderCards();
+  }
+
+  function formatCurrency(input) {
+    let value = String(input).replace(/[^\d.]/g, "");
+    let parts = value.split(".");
+    if (parts[0]) parts[0] = parseInt(parts[0]).toLocaleString('en-US');
+    if (parts.length > 1) {
+      parts[1] = parts[1].slice(0, 2);
+      return "$" + parts[0] + "." + parts[1];
+    }
+    return value ? "$" + parts[0] : "$";
+  }
+
+  function renderCards() {
+    container.innerHTML = ""; 
+    currentItems.forEach((item, index) => {
+      const card = document.createElement("div");
+      card.className = "service-card";
+      card.innerHTML = `
+        <div class="card-title">${item.benefitName || "Service"}</div>
+        <div class="card-row">
+          <span class="card-label">Service Date</span>
+          <div class="card-input-wrapper">
+            <input type="date" class="edit-input date-field" value="${item.serviceDate || ''}">
+          </div>
+        </div>
+        <div class="card-row">
+          <span class="card-label">Service Amount</span>
+          <div class="card-input-wrapper">
+            <input type="text" class="edit-input amount-field" value="${item.amount || '$0.00'}">
+          </div>
+        </div>
+        <div class="card-row">
+            <span class="card-label">Confidence Score</span>
+            <span class="card-value">${item.confidence || '0%'}</span>
+        </div>
+        <div class="card-row">
+            <span class="card-label">Justification</span>
+            <div class="card-justification">${item.justification || ''}</div>
+        </div>
+      `;
+
+      const dIn = card.querySelector(".date-field");
+      const aIn = card.querySelector(".amount-field");
+
+      // Update local copy
+      dIn.addEventListener("change", () => { currentItems[index].serviceDate = dIn.value; });
+      aIn.addEventListener("input", (e) => {
+        const formatted = formatCurrency(e.target.value);
+        e.target.value = formatted;
+        currentItems[index].amount = formatted;
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  confirmBtn.onclick = async () => {
+    console.log("Saving back to App:", currentItems);
+    await App.setVariable("var_MatchedServices_Array", currentItems);
+    alert("Changes successfully saved to the App variable!");
+  };
+
+  loadData();
+  App.onVariableChange("var_MatchedServices_Array", () => loadData());
+})();
