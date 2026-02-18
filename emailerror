@@ -1,0 +1,16 @@
+Subject: URGENT: Hard Blocker - Environment-Wide Permissions Issue (Dev/QA)
+Hi Team,
+I am writing to report a hard blocker that is preventing end-to-end testing in the Dev environment and threatens the stability of our QA pipeline.
+Issue Summary
+We are seeing a System.InvalidOperationException in the Dev tenant (Machine: AZW-UIPBOTDW003) during SharePoint file activities. While the code works in local debug sessions, it fails when triggered via Orchestrator.
+Testing Results
+Local/Debug: Successful.
+QA Environment: Successful (using SVC_RPA_BOT_D03).
+Dev Environment: Failed (using SVC_RPA_BOT_Q02).
+Observations
+I recall that when the Azure permissions for the Graph API were initially configured, the setup involved manually adding permissions for each individual account.
+If this is still the current setup, it may no longer be sustainable. It appears that while some accounts work, others (like SVC_RPA_BOT_Q02) are missing the necessary access. To ensure we can deliver on time, any service account, bot, or machine added to the Dev and QA environments needs to have the full set of permissions and access required to run these automations end-to-end.
+Impact
+This is a hard blocker for testing. We cannot run any automations involving the Graph API through Orchestrator in Dev. Without a stable, environment-wide permission set for all bots and machines, I cannot fully validate the process before moving to production.
+I appreciate your help in confirming the setup and ensuring all Dev/QA accounts are correctly provisioned.
+Best regards,
